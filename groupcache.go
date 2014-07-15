@@ -80,12 +80,12 @@ func GetGroup(name string) *Group {
 // completes.
 //
 // The group name must be unique for each getter.
-func NewGroup(name string, cacheBytes int64, getter Getter) *Group {
-	return newGroup(name, cacheBytes, getter, nil)
+func NewGroup(name string, cacheBytes int64, ttl int64, getter Getter) *Group {
+	return newGroup(name, cacheBytes, ttl, getter, nil)
 }
 
 // If peers is nil, the peerPicker is called via a sync.Once to initialize it.
-func newGroup(name string, cacheBytes int64, getter Getter, peers PeerPicker) *Group {
+func newGroup(name string, cacheBytes int64, ttl int64, getter Getter, peers PeerPicker) *Group {
 	if getter == nil {
 		panic("nil Getter")
 	}
@@ -333,6 +333,9 @@ const (
 	// enough to replicate to this node, even though it's not the
 	// owner.
 	HotCache
+
+	// ForeverTtl defines TTL value for cache groups which values never expire
+	ForeverTtl int64 = -1
 )
 
 // CacheStats returns stats about the provided cache within the group.
