@@ -88,7 +88,7 @@ func TestHTTPPool(t *testing.T) {
 	getter := GetterFunc(func(ctx Context, key string, dest Sink) error {
 		return errors.New("parent getter called; something's wrong")
 	})
-	g := NewGroup("httpPoolTest", 1<<20, ForeverTtl, getter)
+	g := NewGroup("httpPoolTest", 1<<20, ForeverTTL, getter)
 
 	for _, key := range testKeys(nGets) {
 		var value string
@@ -120,7 +120,7 @@ func beChildForTestHTTPPool() {
 		dest.SetString(strconv.Itoa(*peerIndex) + ":" + key)
 		return nil
 	})
-	NewGroup("httpPoolTest", 1<<20, ForeverTtl, getter)
+	NewGroup("httpPoolTest", 1<<20, ForeverTTL, getter)
 
 	log.Fatal(http.ListenAndServe(addrs[*peerIndex], p))
 }

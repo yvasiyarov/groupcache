@@ -30,8 +30,8 @@ import (
 
 	"code.google.com/p/goprotobuf/proto"
 
-	pb "github.com/golang/groupcache/groupcachepb"
-	testpb "github.com/golang/groupcache/testpb"
+	pb "groupcache/groupcachepb"
+	testpb "groupcache/testpb"
 )
 
 var (
@@ -57,7 +57,7 @@ const (
 )
 
 func testSetup() {
-	stringGroup = NewGroup(stringGroupName, cacheSize, ForeverTtl, GetterFunc(func(_ Context, key string, dest Sink) error {
+	stringGroup = NewGroup(stringGroupName, cacheSize, ForeverTTL, GetterFunc(func(_ Context, key string, dest Sink) error {
 		if key == fromChan {
 			key = <-stringc
 		}
@@ -65,7 +65,7 @@ func testSetup() {
 		return dest.SetString("ECHO:" + key)
 	}))
 
-	protoGroup = NewGroup(protoGroupName, cacheSize, ForeverTtl, GetterFunc(func(_ Context, key string, dest Sink) error {
+	protoGroup = NewGroup(protoGroupName, cacheSize, ForeverTTL, GetterFunc(func(_ Context, key string, dest Sink) error {
 		if key == fromChan {
 			key = <-stringc
 		}
@@ -131,7 +131,7 @@ func TestGetDupSuppressProto(t *testing.T) {
 		go func() {
 			tm := new(testpb.TestMessage)
 			if err := protoGroup.Get(dummyCtx, fromChan, ProtoSink(tm)); err != nil {
-				tm.Name = proto.String("ERROR:"+err.Error())
+				tm.Name = proto.String("ERROR:" + err.Error())
 			}
 			resc <- tm
 		}()
@@ -262,7 +262,7 @@ func TestPeers(t *testing.T) {
 		localHits++
 		return dest.SetString("got:" + key)
 	}
-	testGroup := newGroup("TestPeers-group", cacheSize, ForeverTtl, GetterFunc(getter), peerList)
+	testGroup := newGroup("TestPeers-group", cacheSize, ForeverTTL, GetterFunc(getter), peerList)
 	run := func(name string, n int, wantSummary string) {
 		// Reset counters
 		localHits = 0
@@ -324,10 +324,10 @@ func TestPeers(t *testing.T) {
 // WARNING: this test depends on time of execution. It sets 1 second TTL for cache, so last piece
 // of test should be launched before 1 seconds expires
 func TestGettingValuesFromCacheWithExpiration(t *testing.T) {
-	expirationGroup := NewGroup("expiration-group", cacheSize, 1000, GetterFunc(func(_ Context, key string, dest Sink) error {
-			cacheFills.Add(1)
-			return dest.SetString("ECHO:" + key)
-		}))
+	expirationGroup := NewGroup("expiration-group", cacheSize, time.Second, GetterFunc(func(_ Context, key string, dest Sink) error {
+		cacheFills.Add(1)
+		return dest.SetString("ECHO:" + key)
+	}))
 
 	cachePing := func() {
 		var s string
