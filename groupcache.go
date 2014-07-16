@@ -31,9 +31,10 @@ import (
 	"sync"
 	"sync/atomic"
 
-	pb "github.com/golang/groupcache/groupcachepb"
-	"github.com/golang/groupcache/lru"
-	"github.com/golang/groupcache/singleflight"
+	pb "groupcache/groupcachepb"
+	"groupcache/lru"
+	"groupcache/singleflight"
+	"time"
 )
 
 // A Getter loads data for a key.
@@ -80,12 +81,12 @@ func GetGroup(name string) *Group {
 // completes.
 //
 // The group name must be unique for each getter.
-func NewGroup(name string, cacheBytes int64, getter Getter) *Group {
-	return newGroup(name, cacheBytes, getter, nil)
+func NewGroup(name string, cacheBytes int64, ttl time.Duration, getter Getter) *Group {
+	return newGroup(name, cacheBytes, ttl, getter, nil)
 }
 
 // If peers is nil, the peerPicker is called via a sync.Once to initialize it.
-func newGroup(name string, cacheBytes int64, getter Getter, peers PeerPicker) *Group {
+func newGroup(name string, cacheBytes int64, ttl time.Duration, getter Getter, peers PeerPicker) *Group {
 	if getter == nil {
 		panic("nil Getter")
 	}
@@ -101,6 +102,9 @@ func newGroup(name string, cacheBytes int64, getter Getter, peers PeerPicker) *G
 		peers:      peers,
 		cacheBytes: cacheBytes,
 	}
+	g.hotCache.ttl = ttl
+	g.mainCache.ttl = ttl
+
 	if fn := newGroupHook; fn != nil {
 		fn(g)
 	}
@@ -333,6 +337,9 @@ const (
 	// enough to replicate to this node, even though it's not the
 	// owner.
 	HotCache
+
+	// ForeverTTL defines TTL value for cache groups which values never expire
+	ForeverTTL time.Duration = 0
 )
 
 // CacheStats returns stats about the provided cache within the group.
@@ -353,7 +360,8 @@ func (g *Group) CacheStats(which CacheType) CacheStats {
 type cache struct {
 	mu         sync.RWMutex
 	nbytes     int64 // of all keys and values
-	lru        *lru.Cache
+	lru        *lru.CacheTTL
+	ttl        time.Duration
 	nhit, nget int64
 	nevict     int64 // number of evictions
 }
@@ -374,13 +382,13 @@ func (c *cache) add(key string, value ByteView) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.lru == nil {
-		c.lru = &lru.Cache{
-			OnEvicted: func(key lru.Key, value interface{}) {
-				val := value.(ByteView)
-				c.nbytes -= int64(len(key.(string))) + int64(val.Len())
-				c.nevict++
-			},
+		c.lru = lru.NewTTL(0, c.ttl)
+		c.lru.OnEvicted = func(key lru.Key, value interface{}) {
+			val := value.(ByteView)
+			c.nbytes -= int64(len(key.(string))) + int64(val.Len())
+			c.nevict++
 		}
+
 	}
 	c.lru.Add(key, value)
 	c.nbytes += int64(len(key)) + int64(value.Len())

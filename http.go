@@ -25,8 +25,8 @@ import (
 	"sync"
 
 	"code.google.com/p/goprotobuf/proto"
-	"github.com/golang/groupcache/consistenthash"
-	pb "github.com/golang/groupcache/groupcachepb"
+	"groupcache/consistenthash"
+	pb "groupcache/groupcachepb"
 )
 
 // TODO: make this configurable?

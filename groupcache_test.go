@@ -30,8 +30,8 @@ import (
 
 	"code.google.com/p/goprotobuf/proto"
 
-	pb "github.com/golang/groupcache/groupcachepb"
-	testpb "github.com/golang/groupcache/testpb"
+	pb "groupcache/groupcachepb"
+	testpb "groupcache/testpb"
 )
 
 var (
@@ -57,7 +57,7 @@ const (
 )
 
 func testSetup() {
-	stringGroup = NewGroup(stringGroupName, cacheSize, GetterFunc(func(_ Context, key string, dest Sink) error {
+	stringGroup = NewGroup(stringGroupName, cacheSize, ForeverTTL, GetterFunc(func(_ Context, key string, dest Sink) error {
 		if key == fromChan {
 			key = <-stringc
 		}
@@ -65,7 +65,7 @@ func testSetup() {
 		return dest.SetString("ECHO:" + key)
 	}))
 
-	protoGroup = NewGroup(protoGroupName, cacheSize, GetterFunc(func(_ Context, key string, dest Sink) error {
+	protoGroup = NewGroup(protoGroupName, cacheSize, ForeverTTL, GetterFunc(func(_ Context, key string, dest Sink) error {
 		if key == fromChan {
 			key = <-stringc
 		}
@@ -262,7 +262,7 @@ func TestPeers(t *testing.T) {
 		localHits++
 		return dest.SetString("got:" + key)
 	}
-	testGroup := newGroup("TestPeers-group", cacheSize, GetterFunc(getter), peerList)
+	testGroup := newGroup("TestPeers-group", cacheSize, ForeverTTL, GetterFunc(getter), peerList)
 	run := func(name string, n int, wantSummary string) {
 		// Reset counters
 		localHits = 0
@@ -319,6 +319,44 @@ func TestPeers(t *testing.T) {
 	peer0.fail = true
 	run("peer0_failing", 200, "localHits = 100, peers = 51 49 51")
 }
+
+// test that cache tries to retrieve values from backend again when cached values become expired
+// WARNING: this test depends on time of execution. It sets 1 second TTL for cache, so last piece
+// of test should be launched before 1 seconds expires
+func TestGettingValuesFromCacheWithExpiration(t *testing.T) {
+	expirationGroup := NewGroup("expiration-group", cacheSize, time.Second, GetterFunc(func(_ Context, key string, dest Sink) error {
+		cacheFills.Add(1)
+		return dest.SetString("ECHO:" + key)
+	}))
+
+	cachePing := func() {
+		var s string
+		if err := expirationGroup.Get(dummyCtx, "TestCaching-key", StringSink(&s)); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if fills := countFills(cachePing); fills != 1 {
+		t.Errorf("expected 1 cache fill because of empty cache; got %d", fills)
+	}
+
+	// cache value should not expire because 1 second should not pass
+	if cachedFills := countFills(cachePing); cachedFills != 0 {
+		t.Errorf("expected no cache fill because expiration time had not passed yet; got %d", cachedFills)
+	}
+
+	// cache value should expire after 1 second
+	time.Sleep(time.Second)
+
+	if expiredFills := countFills(cachePing); expiredFills != 1 {
+		t.Errorf("expected 1 cache fill because record should expire; got %d", expiredFills)
+	}
+}
+
+// test that groupcache removes expired values when there is not enough memory to load new value
+//func TestCacheRemovesExpiredWhenNotEnoughMemory(t *testing.T) {
+//
+//}
 
 func TestTruncatingByteSliceTarget(t *testing.T) {
 	var buf [100]byte
