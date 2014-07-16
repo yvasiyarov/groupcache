@@ -31,9 +31,9 @@ import (
 	"sync"
 	"sync/atomic"
 
-	pb "groupcache/groupcachepb"
-	"groupcache/lru"
-	"groupcache/singleflight"
+	pb "github.com/yvasiyarov/groupcache/groupcachepb"
+	"github.com/yvasiyarov/groupcache/lru"
+	"github.com/yvasiyarov/groupcache/singleflight"
 	"time"
 )
 

@@ -19,7 +19,7 @@ limitations under the License.
 package groupcache
 
 import (
-	pb "groupcache/groupcachepb"
+	pb "github.com/yvasiyarov/groupcache/groupcachepb"
 )
 
 // Context is an opaque value passed through calls to the
